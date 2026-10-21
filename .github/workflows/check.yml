@@ -1,0 +1,40 @@
+name: Validate map
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check app.js
+          node --check data.js
+          node --check maps.js
+          node --check scripts/build-site.mjs
+          node --check scripts/verify-data.mjs
+      - name: Check Python syntax
+        run: python3 -c "import ast,pathlib; ast.parse(pathlib.Path('scripts/build-tiles.py').read_text())"
+      - name: Verify points and map tiles
+        run: node scripts/verify-data.mjs
+      - name: Build static site
+        run: node scripts/build-site.mjs
+      - name: Check deployment exclusions
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          files = [p for p in Path('dist').rglob('*') if p.is_file()]
+          assert (Path('dist') / 'index.html').is_file()
+          assert not any(p.suffix.lower() in ['.png', '.jpg'] for p in files)
+          assert not (Path('dist') / 'source').exists()
+          print(f'{len(files)} files, {sum(p.stat().st_size for p in files):,} bytes; no original images or source records')
+          PYCODE

@@ -1,0 +1,23 @@
+{
+  "main": {
+    "sourceBytes": 84951511,
+    "tileCount": 215,
+    "tileBytes": 14189920,
+    "largestTileBytes": 111496,
+    "previewBytes": 41440
+  },
+  "blizzard": {
+    "sourceBytes": 117260271,
+    "tileCount": 65,
+    "tileBytes": 5055046,
+    "largestTileBytes": 125334,
+    "previewBytes": 71698
+  },
+  "hotwheels": {
+    "sourceBytes": 37137479,
+    "tileCount": 101,
+    "tileBytes": 1932230,
+    "largestTileBytes": 60212,
+    "previewBytes": 13496
+  }
+}

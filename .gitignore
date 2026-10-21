@@ -1,0 +1,20 @@
+# Large source images: preserved locally, never uploaded.
+/source/originals/
+/Australia.png
+/Blizzard Mountain.png
+/Hot Wheels Thrilltopia.png
+
+# Generated output and local verification artifacts.
+/dist/
+/verification/
+/node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+
+# Local settings and credentials.
+.DS_Store
+.env
+.env.*
+!.env.example
