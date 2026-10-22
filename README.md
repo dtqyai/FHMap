@@ -1,6 +1,6 @@
-# Forza Horizon 3 Interactive Map
+# Forza Horizon Interactive Map
 
-《极限竞速：地平线 3》本地收集地图，包含澳洲大陆 183 个点位、暴风雪山 26 个点位、风火轮 26 个点位。
+按作品选项卡组织的 Forza Horizon 收集地图。目前提供 **Forza Horizon 3**，包含澳洲大陆 183 个点位、暴风雪山 26 个点位、风火轮 26 个点位。
 
 点击点位切换收集状态，支持按类型和状态筛选、拖动缩放、进度导入/导出。进度保存在浏览器 localStorage，无需账号或后端。
 

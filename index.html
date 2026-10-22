@@ -2,16 +2,17 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#141b24"><meta name="description" content="极限竞速：地平线 3 本地收集地图。235 个收集点，离线使用，进度自动保存在浏览器。">
-<title>Forza Horizon 3 Interactive Map</title>
+<meta name="theme-color" content="#141b24"><meta name="description" content="Forza Horizon 互动地图，支持收集点标记、区域筛选及进度导入导出。">
+<title>Forza Horizon Interactive Map</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
 <script defer src="data.js"></script><script defer src="maps.js"></script><script defer src="app.js"></script>
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="./" aria-label="Forza Horizon 3 Interactive Map 首页"><span class="brand-mark">H<span>3</span></span><span class="brand-copy"><strong>Forza Horizon 3 Interactive Map</strong></span></a>
+  <a class="brand" href="./" aria-label="Forza Horizon Interactive Map 首页"><span class="brand-mark" aria-hidden="true">H</span><span class="brand-copy"><strong>Forza Horizon Interactive Map</strong></span></a>
 </header>
-<div class="workspace">
+<nav class="game-nav" aria-label="选择作品"><div class="game-tabs" id="games" role="tablist" aria-label="作品"><button type="button" id="game-fh3-tab" role="tab" aria-selected="true" aria-controls="game-fh3-panel" data-game="fh3">Forza Horizon 3</button></div></nav>
+<div class="workspace" id="game-fh3-panel" role="tabpanel" aria-labelledby="game-fh3-tab">
 <aside class="sidebar" id="sidebar" aria-label="收集筛选与进度">
   <div class="sidebar-content">
   <div class="sidebar-heading"><button class="icon-button mobile-only" id="close-sidebar" aria-label="关闭筛选">×</button></div>
