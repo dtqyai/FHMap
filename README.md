@@ -29,6 +29,7 @@ python3 -m http.server 8763 --bind 127.0.0.1
 | `source/` | 点位提取记录、配准结果、构建统计与缓存配置 |
 | `source/reference/` | 核对来源所用的旧底图与原站样式，不被页面加载 |
 | `scripts/` | 数据校验、瓦片生成、静态包构建 |
+| `wrangler.jsonc` | Cloudflare Worker 名称与静态资源目录 |
 
 以下目录由 `.gitignore` 排除：
 
@@ -54,6 +55,22 @@ GitHub Actions 在推送和拉取请求时执行语法检查、点位/瓦片校�
 部署时只上传 **dist/** 的内容。构建不包含原始 PNG、来源记录、旧底图或截图。`dist/_headers` 提供带哈希瓦片的长期缓存及页面/脚本重新验证配置，需托管平台支持或配置等效响应头。
 
 页面先加载小预览，再按视口和缩放加载 512 像素 WebP 瓦片，最多四个瓦片并发请求。离屏请求会取消，缓存约 96 块；不会一次下载全部地图，也不请求原始 PNG。图片负载随视口、像素比和缩放变化。
+
+## Cloudflare Workers
+
+仓库包含 `wrangler.jsonc`，Worker 名称为 `fhmap`，仅发布 `dist/`。Cloudflare 控制台的构建设置为：
+
+| 配置 | 值 |
+| --- | --- |
+| Git 仓库 | `dtqyai/FHMap` |
+| 生产分支 | `main` |
+| 构建命令 | `node scripts/build-site.mjs` |
+| 部署命令 | `npx wrangler deploy` |
+| 预览命令 | `npx wrangler preview` |
+| 根目录 | `/` |
+| 构建监视包括路径 | `*` |
+
+GitHub 的 `Validate map` 只负责校验和构建，不会自行发布到 Cloudflare。自动发布由 Cloudflare 的 Git 集成触发；若控制台提示 Git 帐户已断开，需要恢复 Cloudflare Workers and Pages 对此仓库的授权后再部署。
 
 ## 重新生成瓦片
 

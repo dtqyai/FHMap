@@ -32,6 +32,10 @@ jobs:
         run: |
           python3 - <<'PYCODE'
           from pathlib import Path
+          import json
+          config = json.loads(Path('wrangler.jsonc').read_text())
+          assert config['name'] == 'fhmap'
+          assert config['assets']['directory'] == './dist'
           files = [p for p in Path('dist').rglob('*') if p.is_file()]
           assert (Path('dist') / 'index.html').is_file()
           assert not any(p.suffix.lower() in ['.png', '.jpg'] for p in files)
