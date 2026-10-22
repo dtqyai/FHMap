@@ -76,10 +76,10 @@ window.FH3_MAPS = {
     "width": 8192,
     "height": 8192,
     "crop": [
-      2600,
-      2350,
-      2800,
-      3700
+      0,
+      0,
+      2408,
+      2815
     ],
     "unit": 0.2235121686341967,
     "position": [
@@ -100,38 +100,56 @@ window.FH3_MAPS = {
     ],
     "tiles": {
       "size": 512,
-      "base": "assets/maps/blizzard/a74e60b87c03",
+      "base": "assets/maps/blizzard/d1d11d7202c2",
       "levels": [
         {
           "z": 0,
-          "width": 350,
-          "height": 463,
+          "width": 301,
+          "height": 352,
           "cols": 1,
           "rows": 1
         },
         {
           "z": 1,
-          "width": 700,
-          "height": 925,
+          "width": 602,
+          "height": 704,
           "cols": 2,
           "rows": 2
         },
         {
           "z": 2,
-          "width": 1400,
-          "height": 1850,
+          "width": 1204,
+          "height": 1408,
           "cols": 3,
-          "rows": 4
+          "rows": 3
         },
         {
           "z": 3,
-          "width": 2800,
-          "height": 3700,
-          "cols": 6,
-          "rows": 8
+          "width": 2408,
+          "height": 2815,
+          "cols": 5,
+          "rows": 6
         }
       ]
-    }
+    },
+    "referenceCrop": [
+      0,
+      1228,
+      538,
+      629
+    ],
+    "oldToMap": [
+      [
+        4.474029338584311,
+        0,
+        0.0
+      ],
+      [
+        0,
+        4.474029338584311,
+        -5494.108027781534
+      ]
+    ]
   },
   "hotwheels": {
     "name": "风火轮",

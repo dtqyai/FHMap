@@ -24,7 +24,7 @@ python3 -m http.server 8763 --bind 127.0.0.1
 | --- | --- |
 | `index.html`、`style.css`、`app.js` | 页面与交互，无第三方运行依赖 |
 | `data.js`、`maps.js` | 原站点位及高清地图配置 |
-| `assets/maps/` | 381 块运行所需的多级 WebP 瓦片，约 21.2 MB |
+| `assets/maps/` | 360 块运行所需的多级 WebP 瓦片，约 19.3 MB |
 | `assets/favicon.svg` | 页面图标 |
 | `source/` | 点位提取记录、配准结果、构建统计与缓存配置 |
 | `source/reference/` | 核对来源所用的旧底图与原站样式，不被页面加载 |
@@ -77,4 +77,4 @@ node scripts/build-site.mjs
 
 点位来自 [KudosPrime FH3 地图](https://www.kudosprime.com/fh3/gamemap.php)，提取日期为 2026-10-21，保留原站 ID、类别、源坐标和提示。原站没有 #145，实际为 235 个点位；未逐点进入游戏核验。
 
-底图来自 [The Spriters Resource 的 Forza Horizon 3 页面](https://www.spriters-resource.com/xbox_one/forzahorizon3/)，使用用户提供的三张高清 PNG；Australia 图署名为 Trekeln。暴风雪山点位经过旋转配准以适应新图朝向。Forza Horizon 为 Microsoft 的商标。
+底图来自 [The Spriters Resource 的 Forza Horizon 3 页面](https://www.spriters-resource.com/xbox_one/forzahorizon3/)，使用用户提供的三张高清 PNG；Australia 图署名为 Trekeln。暴风雪山高清瓦片保留最初地图的朝向，点位使用同一参考坐标系；原始 PNG 保持不变。Forza Horizon 为 Microsoft 的商标。

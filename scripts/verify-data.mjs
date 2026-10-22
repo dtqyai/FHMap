@@ -44,8 +44,16 @@ for(const [key,map] of Object.entries(context.window.FH3_MAPS)) {
   assert.ok(calibration[key].inliers>100);
   assert.ok(calibration[key].p95ErrorInImagePixels<5);
   const [cx,cy,cw,ch]=map.crop;
+  if(map.referenceCrop) {
+    const [rx,ry,rw,rh]=map.referenceCrop,s=1/map.unit;
+    assert.equal(key,'blizzard');
+    assert.equal(JSON.stringify(map.oldToMap),JSON.stringify([[s,0,-rx*s],[0,s,-ry*s]]),'Reference orientation must have no rotation or shear');
+    assert.equal(cx,0);assert.equal(cy,0);
+    assert.equal(cw,Math.ceil(rw*s));assert.equal(ch,Math.ceil(rh*s));
+  }
+  if(key==='blizzard')assert.ok(map.referenceCrop&&map.oldToMap,'Blizzard must retain the reference map orientation');
   for(const [id,type,x,y] of data.points.filter(p=>data.types[p[1]].region===key)) {
-    const [a,b]=map.oldToImage,px=a[0]*x+a[1]*y+a[2],py=b[0]*x+b[1]*y+b[2];
+    const [a,b]=map.oldToMap||map.oldToImage,px=a[0]*x+a[1]*y+a[2],py=b[0]*x+b[1]*y+b[2];
     assert.ok(px>=cx&&px<=cx+cw&&py>=cy&&py<=cy+ch,'Calibrated point outside crop: '+id);
   }
   for(const level of map.tiles.levels)for(let y=0;y<level.rows;y++)for(let x=0;x<level.cols;x++) {

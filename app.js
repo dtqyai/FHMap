@@ -10,7 +10,7 @@
     regions[key]={name:config.name,box:[x,y,w*config.unit,h*config.unit]};
   }
   function imagePoint(key,x,y) {
-    const [a,b]=mapConfigs[key].oldToImage;
+    const config=mapConfigs[key],[a,b]=config.oldToMap||config.oldToImage;
     return [a[0]*x+a[1]*y+a[2],b[0]*x+b[1]*y+b[2]];
   }
   const byId = new Map();

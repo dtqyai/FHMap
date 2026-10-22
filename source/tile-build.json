@@ -8,10 +8,10 @@
   },
   "blizzard": {
     "sourceBytes": 117260271,
-    "tileCount": 65,
-    "tileBytes": 5055046,
-    "largestTileBytes": 125334,
-    "previewBytes": 71698
+    "tileCount": 44,
+    "tileBytes": 3173066,
+    "largestTileBytes": 118804,
+    "previewBytes": 47816
   },
   "hotwheels": {
     "sourceBytes": 37137479,
