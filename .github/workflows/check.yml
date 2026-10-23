@@ -15,9 +15,16 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
+          cache: npm
+      - name: Install development dependencies
+        run: npm ci
+      - name: Check source formatting
+        run: npm run format:check
       - name: Check JavaScript syntax
         run: |
           node --check app.js
+          node --check tiles.js
+          node --check progress.js
           node --check data.js
           node --check maps.js
           node --check scripts/build-site.mjs
@@ -26,8 +33,14 @@ jobs:
         run: python3 -c "import ast,pathlib; ast.parse(pathlib.Path('scripts/build-tiles.py').read_text())"
       - name: Verify points and map tiles
         run: node scripts/verify-data.mjs
+      - name: Test progress transactions
+        run: npm test
       - name: Build static site
         run: node scripts/build-site.mjs
+      - name: Install browser for regression tests
+        run: npx playwright install --with-deps chromium
+      - name: Test browser interactions
+        run: npm run test:browser
       - name: Check deployment exclusions
         run: |
           python3 - <<'PYCODE'

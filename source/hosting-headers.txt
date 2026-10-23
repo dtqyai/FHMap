@@ -12,3 +12,7 @@
   Cache-Control: no-cache
 /style.css
   Cache-Control: no-cache
+/progress.js
+  Cache-Control: no-cache
+/tiles.js
+  Cache-Control: no-cache

@@ -1,0 +1,16 @@
+{
+  "devDependencies": {
+    "playwright": "1.62.1",
+    "prettier": "3.9.10"
+  },
+  "name": "fh3-map",
+  "private": true,
+  "scripts": {
+    "check": "node --check app.js && node --check tiles.js && node --check progress.js && node scripts/verify-data.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node --test tests/browser/*.test.mjs",
+    "build": "node scripts/build-site.mjs",
+    "format": "prettier --write app.js tiles.js progress.js style.css index.html scripts/*.mjs tests/**/*.mjs tests/*.mjs",
+    "format:check": "prettier --check app.js tiles.js progress.js style.css index.html scripts/*.mjs tests/**/*.mjs tests/*.mjs"
+  }
+}
