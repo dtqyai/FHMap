@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 
 const context = { window: {} };
 runInNewContext(readFileSync(new URL('../progress.js', import.meta.url), 'utf8'), context);
-const { prefix, create } = context.window.FH3Progress;
+const { prefix, revisionPrefix, create } = context.window.FH3Progress;
 function fixture(initial = {}) {
   const values = new Map(Object.entries(initial));
   let fail = null;
@@ -15,9 +15,17 @@ function fixture(initial = {}) {
       if (fail?.(key, value)) throw new Error('Quota exceeded');
       values.set(key, value);
     },
-    removeItem: (key) => values.delete(key),
+    removeItem(key) {
+      if (fail?.(key, null)) throw new Error('Storage unavailable');
+      values.delete(key);
+    },
   };
-  return { values, store: create([1, 2, 3], () => storage), failWhen: (fn) => (fail = fn) };
+  return {
+    values,
+    store: create([1, 2, 3], () => storage),
+    otherStore: create([1, 2, 3], () => storage),
+    failWhen: (fn) => (fail = fn),
+  };
 }
 test('reads old per-point keys and persists individual changes', () => {
   const { store, values } = fixture({ [prefix + 1]: '1', [prefix + 2]: '0' });
@@ -80,4 +88,50 @@ test('read failure does not turn a merge into a replacement', () => {
     },
   }));
   assert.throws(() => store.import([2]));
+});
+
+test('undo preserves a point changed away and back by another writer', () => {
+  const { store, otherStore, values } = fixture();
+  const changes = store.import([1, 2]);
+  otherStore.set(1, false);
+  otherStore.set(1, true);
+  const revision = values.get(revisionPrefix + 1);
+  const undone = store.undo(changes);
+  assert.deepEqual([...undone.keys()], [2]);
+  assert.deepEqual([...store.read()], [1]);
+  assert.equal(values.get(revisionPrefix + 1), revision);
+});
+test('a later explicit mark of the same value also invalidates older undo', () => {
+  const { store, otherStore } = fixture();
+  const changes = store.import([1]);
+  otherStore.set(1, true);
+  assert.equal(store.undo(changes).size, 0);
+  assert.deepEqual([...store.read()], [1]);
+});
+test('revision or value write failures leave the previous point and revision intact', () => {
+  for (const failedKey of [revisionPrefix + 1, prefix + 1]) {
+    const { store, values, failWhen } = fixture();
+    store.set(1, true);
+    const initial = new Map(values);
+    failWhen((key) => key === failedKey);
+    assert.throws(
+      () => store.set(1, false),
+      (e) => e.restored === true,
+    );
+    assert.deepEqual(values, initial);
+  }
+});
+test('a failed undo restores revisions so the same undo can be retried', () => {
+  const { store, values, failWhen } = fixture();
+  const changes = store.import([1, 2]);
+  const initial = new Map(values);
+  let failed = false;
+  failWhen((key, value) => key === prefix + 2 && value === null && !failed && (failed = true));
+  assert.throws(
+    () => store.undo(changes),
+    (e) => e.restored === true,
+  );
+  assert.deepEqual(values, initial);
+  assert.equal(store.undo(changes).size, 2);
+  assert.deepEqual([...store.read()], []);
 });

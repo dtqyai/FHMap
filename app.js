@@ -3,7 +3,8 @@
   const { types, points } = window.FH3_DATA;
   const mapConfigs = window.FH3_MAPS;
   const $ = (id) => document.getElementById(id);
-  const PREFIX = window.FH3Progress.prefix;
+  const { prefix: PREFIX, revisionPrefix: REVISION_PREFIX } = window.FH3Progress;
+  const touchTargets = matchMedia('(pointer: coarse)');
   const regions = {};
   for (const [key, config] of Object.entries(mapConfigs)) {
     const [x, y] = config.position,
@@ -25,7 +26,8 @@
     tx = 0,
     ty = 0,
     fitScale = 1,
-    renderRequest = 0;
+    renderRequest = 0,
+    syncRequest = 0;
   let undo = null,
     toastTimer,
     backupMode = 'export',
@@ -62,11 +64,12 @@
     button.className = 'marker';
     button.dataset.id = id;
     button.style.setProperty('--color', types[type].color);
-    button.innerHTML = icon(type);
+    button.innerHTML = '<span class="marker-symbol" aria-hidden="true">' + icon(type) + '</span>';
     button.addEventListener('click', (e) => {
       e.stopPropagation();
       if (suppressClick && e.detail !== 0) return;
-      setCollected(id, !collected.has(id));
+      const target = touchTargets.matches && e.detail !== 0 ? nearestMarker(e, id) : id;
+      setCollected(target, !collected.has(target));
     });
     p.el = button;
     $('markers').append(button);
@@ -168,7 +171,10 @@
       const checked = collected.has(p.id),
         show = matches(p);
       visible += Number(show);
+      if (!show && p.el === document.activeElement) map.focus({ preventScroll: true });
       p.el.hidden = !show;
+      if (p.checked === checked) continue;
+      p.checked = checked;
       p.el.classList.toggle('done', checked);
       p.el.setAttribute(
         'aria-label',
@@ -180,7 +186,7 @@
       );
       p.el.setAttribute('aria-pressed', String(checked));
       p.el.title = types[p.type].name + ' ' + number(p.id) + (checked ? ' · 已收集' : ' · 未收集');
-      p.el.innerHTML = checked ? '✓' : icon(p.type);
+      p.el.firstElementChild.innerHTML = checked ? '✓' : icon(p.type);
     }
     for (const button of $('categories').children) {
       const type = Number(button.dataset.type),
@@ -210,6 +216,7 @@
       current.filter((p) => collected.has(p.id)).length + ' / ' + current.length + ' 已收集';
     for (const b of $('status-filter').children)
       b.setAttribute('aria-pressed', String(b.dataset.status === status));
+    if (backupMode === 'export' && $('backup-dialog').open) refreshExport();
     scheduleMap();
   }
   function scheduleMap() {
@@ -226,7 +233,9 @@
   }
   function drawMap() {
     clampPosition();
-    const markerSize = Math.max(14, Math.min(26, scale * 35 + 5));
+    const markerSize = touchTargets.matches
+      ? Math.max(22, Math.min(28, scale * 35 + 5))
+      : Math.max(14, Math.min(26, scale * 35 + 5));
     map.style.setProperty('--marker-size', markerSize + 'px');
     layoutMarkers();
     $('zoom-level').textContent = Math.round(scale * 100) + '%';
@@ -239,6 +248,37 @@
         'translate(' + (p.x * scale + tx) + 'px,' + (p.y * scale + ty) + 'px) translate(-50%,-50%)';
     }
   }
+  function nearestMarker(event, fallback) {
+    const rect = map.getBoundingClientRect(),
+      x = event.clientX - rect.left,
+      y = event.clientY - rect.top;
+    let closest = fallback,
+      distance = Infinity;
+    for (const p of byId.values()) {
+      if (p.el.hidden) continue;
+      const dx = p.x * scale + tx - x,
+        dy = p.y * scale + ty - y;
+      if (Math.abs(dx) <= 22 && Math.abs(dy) <= 22 && Math.hypot(dx, dy) < distance) {
+        closest = p.id;
+        distance = Math.hypot(dx, dy);
+      }
+    }
+    return closest;
+  }
+  map.addEventListener('focusin', (event) => {
+    const button = event.target.closest('.marker');
+    if (!button || !button.matches(':focus-visible')) return;
+    const p = byId.get(Number(button.dataset.id)),
+      x = p.x * scale + tx,
+      y = p.y * scale + ty,
+      left = Math.min(40, map.clientWidth / 3),
+      right = Math.max(left, map.clientWidth - 90),
+      top = Math.min(80, map.clientHeight / 3),
+      bottom = Math.max(top, map.clientHeight - 60);
+    tx += Math.max(left, Math.min(right, x)) - x;
+    ty += Math.max(top, Math.min(bottom, y)) - y;
+    drawMap();
+  });
   function fitMap() {
     const [x, y, w, h] = regions[region].box;
     const pad = map.clientWidth < 500 ? 26 : 40;
@@ -270,7 +310,17 @@
       open = $('sidebar').classList.contains('open');
     $('sidebar').inert = mobile && !open;
     document.querySelector('.main').inert = mobile && open;
-    if (!mobile) $('sidebar-scrim').hidden = true;
+    $('sidebar-scrim').hidden = !(mobile && open);
+    $('mobile-filters').setAttribute('aria-expanded', String(mobile && open));
+    if (
+      mobile &&
+      open &&
+      !document.querySelector('dialog[open]') &&
+      !$('sidebar').contains(document.activeElement)
+    )
+      $('close-sidebar').focus({ preventScroll: true });
+    else if (mobile && !open && $('sidebar').contains(document.activeElement))
+      $('mobile-filters').focus({ preventScroll: true });
   }
   function closeSidebar() {
     const wasOpen = $('sidebar').classList.contains('open');
@@ -324,11 +374,18 @@
   $('undo-button').addEventListener('click', () => {
     if (!undo) return;
     try {
-      progress.undo(undo);
+      const expected = undo.size,
+        changes = progress.undo(undo);
       undo = null;
       loadProgress();
       render();
-      notify('已撤销上次操作');
+      notify(
+        changes.size === expected
+          ? '已撤销上次操作'
+          : changes.size
+            ? '已撤销部分标记，保留后续修改'
+            : '没有可撤销的标记，已保留后续修改',
+      );
     } catch {
       loadProgress();
       render();
@@ -486,6 +543,15 @@
       collected: [...collected].sort((a, b) => a - b),
     };
   }
+  function refreshExport() {
+    $('backup-intro').textContent =
+      '下载备份后，可在其他浏览器或电脑上导入。当前已收集 ' +
+      collected.size +
+      ' / ' +
+      points.length +
+      '。';
+    $('backup-content').value = JSON.stringify(backupObject(), null, 2);
+  }
   function openBackup(mode) {
     backupMode = mode;
     $('backup-title').textContent = mode === 'export' ? '导出收集进度' : '导入收集进度';
@@ -535,6 +601,13 @@
   }
   $('backup-submit').addEventListener('click', () => {
     if (backupMode === 'export') {
+      if (!loadProgress()) {
+        backupError('无法读取最新进度，请检查浏览器存储设置后重试。');
+        return;
+      }
+      render();
+      refreshExport();
+      $('backup-error').hidden = true;
       const blob = new Blob([$('backup-content').value], { type: 'application/json' }),
         url = URL.createObjectURL(blob),
         link = document.createElement('a');
@@ -590,16 +663,19 @@
       changes.size > 0,
     );
   });
-  window.addEventListener('storage', (e) => {
-    if (e.key === null || e.key.startsWith(PREFIX)) {
+  function scheduleProgressSync() {
+    if (syncRequest) return;
+    syncRequest = requestAnimationFrame(() => {
+      syncRequest = 0;
       loadProgress();
       render();
-    }
+    });
+  }
+  window.addEventListener('storage', (e) => {
+    if (e.key === null || e.key.startsWith(PREFIX) || e.key.startsWith(REVISION_PREFIX))
+      scheduleProgressSync();
   });
-  window.addEventListener('focus', () => {
-    loadProgress();
-    render();
-  });
+  window.addEventListener('focus', scheduleProgressSync);
   new ResizeObserver(() => {
     const size = [map.clientWidth, map.clientHeight];
     if (!lastMapSize) {
@@ -615,6 +691,6 @@
   tiles.show(region);
   buildCategories();
   fitMap();
-  zoom(innerWidth > 760 ? 1.8 : 1.4);
+  zoom(1.8);
   render();
 })();

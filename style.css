@@ -407,7 +407,7 @@ button:disabled {
 .map {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   isolation: isolate;
   touch-action: none;
   outline: none;
@@ -999,11 +999,23 @@ input[type='checkbox'] {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--marker-size, 25px);
-  height: var(--marker-size, 23px);
+  width: var(--marker-hit-size, var(--marker-size, 25px));
+  height: var(--marker-hit-size, var(--marker-size, 23px));
   padding: 0;
   pointer-events: auto;
   touch-action: none;
+  background: none;
+  border: 0;
+  will-change: transform;
+}
+.marker-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--marker-size, 25px);
+  height: var(--marker-size, 23px);
+  flex: none;
+  pointer-events: none;
   background: color-mix(in srgb, var(--color) 88%, #26303c);
   color: #14202b;
   border: 1.5px solid #ffffffc0;
@@ -1011,7 +1023,6 @@ input[type='checkbox'] {
   border-radius: 4px;
   font-size: clamp(7px, calc(var(--marker-size, 25px) * 0.38), 10px);
   font-weight: 850;
-  will-change: transform;
   transition:
     background 0.15s,
     box-shadow 0.15s;
@@ -1026,11 +1037,15 @@ input[type='checkbox'] {
 .marker:hover,
 .marker:focus-visible {
   z-index: 5;
+}
+.marker:hover .marker-symbol,
+.marker:focus-visible .marker-symbol {
+  z-index: 5;
   box-shadow:
     0 0 0 4px #ffffff50,
     0 3px 10px #0009;
 }
-.marker.done {
+.marker.done .marker-symbol {
   background: #203f3a;
   color: #8df3cb;
   border-color: #8df3cb;
@@ -1052,6 +1067,9 @@ input[type='checkbox'] {
   color: #edf2f5;
 }
 @media (pointer: coarse) {
+  .map {
+    --marker-hit-size: 44px;
+  }
   .map-tools button {
     width: 44px;
     height: 44px;

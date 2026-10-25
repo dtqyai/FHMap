@@ -481,3 +481,252 @@ test('pinching from an individual marker follows repeated touch moves', async ()
   await total(0);
   assert.equal(await page.locator('#map').getAttribute('class'), 'map');
 });
+
+test('an open export stays current and download refreshes the stored progress', async () => {
+  await page.goto(url);
+  await ready();
+  await page.locator('#export-button').click();
+  const second = await context.newPage();
+  await second.goto(url);
+  await importProgress([1, 2, 3], false, second);
+  await total(3);
+  await until(
+    async () =>
+      JSON.parse(await page.locator('#backup-content').inputValue()).collected.length === 3,
+  );
+  assert.match(await page.locator('#backup-intro').textContent(), /3 \/ 235/);
+  // Download must read storage even if the displayed snapshot is stale.
+  await page.locator('#backup-content').evaluate((el) => {
+    el.value = '{"collected":[]}';
+  });
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#backup-submit').click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream(),
+    chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  assert.deepEqual(JSON.parse(Buffer.concat(chunks)).collected, [1, 2, 3]);
+});
+test('export reports a read failure instead of downloading a stale backup', async () => {
+  await page.goto(url);
+  await ready();
+  await importProgress([1]);
+  await page.locator('#export-button').click();
+  let downloads = 0;
+  page.on('download', () => downloads++);
+  await page.evaluate(() => {
+    Storage.prototype.getItem = () => {
+      throw new Error('Denied');
+    };
+  });
+  await page.locator('#backup-submit').click();
+  assert.match(await page.locator('#backup-error').textContent(), /无法读取最新进度/);
+  assert.equal(downloads, 0);
+  assert.equal(await page.locator('#backup-dialog').isVisible(), true);
+});
+test('import undo preserves a point another tab cancelled and marked again', async () => {
+  await page.goto(url);
+  await ready();
+  const second = await context.newPage();
+  await second.goto(url);
+  await importProgress([1, 2]);
+  await second.evaluate(() => {
+    const progress = window.FH3Progress.create(window.FH3_DATA.points.map((p) => p[0]));
+    progress.set(1, false);
+    progress.set(1, true);
+  });
+  await page.locator('#undo-button').click();
+  await total(1);
+  assert.deepEqual(
+    await page.evaluate(() => [1, 2].map((id) => localStorage.getItem('fh3.collect.v1.' + id))),
+    ['1', null],
+  );
+});
+test('tabbing through offscreen markers pans the map without scrolling its controls', async () => {
+  await page.goto(url);
+  await ready();
+  await page.locator('#map').focus();
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('Tab');
+    const position = await page.evaluate(() => {
+      const map = document.querySelector('#map'),
+        rect = map.getBoundingClientRect(),
+        marker = document.activeElement,
+        point = marker.getBoundingClientRect();
+      return {
+        isMarker: marker.matches('.marker'),
+        scrollX: map.scrollLeft,
+        scrollY: map.scrollTop,
+        barBottom: document.querySelector('.map-bottom').getBoundingClientRect().bottom,
+        mapBottom: rect.bottom,
+        onScreen:
+          point.x >= rect.x &&
+          point.right <= rect.right &&
+          point.y >= rect.y &&
+          point.bottom <= rect.bottom,
+      };
+    });
+    assert.equal(position.isMarker, true);
+    assert.equal(position.scrollX, 0);
+    assert.equal(position.scrollY, 0);
+    assert.ok(Math.abs(position.barBottom - position.mapBottom) < 1);
+    assert.equal(position.onScreen, true);
+  }
+  await page.screenshot({ path: resolve(screenshots, 'keyboard-navigation.png') });
+  await page.keyboard.press('Enter');
+  await total(1);
+});
+test('hanging previews and detail requests time out, release slots and recover', async () => {
+  let hang = true;
+  const requests = [];
+  await context.route('**/assets/maps/main/**/*.webp', (route) => {
+    requests.push(route.request().url());
+    if (!hang) return route.continue();
+  });
+  await page.clock.install();
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await until(
+    async () =>
+      requests.length >= 5 &&
+      Number(await page.locator('#map').getAttribute('data-active-requests')) === 4,
+  );
+  await page.clock.fastForward(5000);
+  assert.equal(await page.locator('#retry-map').isVisible(), false);
+  hang = false;
+  await page.clock.fastForward(5001);
+  await until(
+    async () => await page.locator('#retry-map').isVisible(),
+    'timeout did not expose retry',
+  );
+  await until(async () => requests.length > 5, 'timed out requests did not release queue slots');
+  await page.locator('#retry-map').click();
+  await ready();
+  assert.equal(await page.locator('#retry-map').isVisible(), false);
+  assert.ok(Number(await page.locator('#map').getAttribute('data-max-active-requests')) <= 4);
+});
+test('touch targets are 44 pixels and dense taps select the nearest individual point', async () => {
+  await context.close();
+  context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  page = await context.newPage();
+  await page.goto(url);
+  await ready();
+  const targets = await page.locator('.marker:not([hidden])').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { width: r.width, height: r.height };
+    }),
+  );
+  assert.ok(targets.every((r) => Math.round(r.width) >= 44 && Math.round(r.height) >= 44));
+  const crowded = await page.evaluate(() => {
+    const rect = document.querySelector('#map').getBoundingClientRect();
+    for (const el of document.querySelectorAll('.marker:not([hidden])')) {
+      const r = el.getBoundingClientRect(),
+        x = r.x + r.width / 2,
+        y = r.y + r.height / 2,
+        hit = document.elementFromPoint(x, y)?.closest('.marker');
+      if (
+        x > rect.x + 30 &&
+        x < rect.right - 80 &&
+        y > rect.y + 90 &&
+        y < rect.bottom - 60 &&
+        hit &&
+        hit !== el
+      )
+        return { id: el.dataset.id, x, y };
+    }
+  });
+  assert.ok(crowded, 'a dense area is required to test overlapping hit targets');
+  await page.touchscreen.tap(crowded.x, crowded.y);
+  await total(1);
+  assert.equal(
+    await page.locator('.marker[data-id="' + crowded.id + '"]').getAttribute('aria-pressed'),
+    'true',
+  );
+  await page.touchscreen.tap(crowded.x, crowded.y);
+  await total(0);
+  const edge = await page.evaluate(() => {
+    const rect = document.querySelector('#map').getBoundingClientRect(),
+      points = [...document.querySelectorAll('.marker:not([hidden])')].map((el) => {
+        const r = el.getBoundingClientRect();
+        return { el, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+    for (const p of points)
+      for (const [dx, dy] of [
+        [18, 0],
+        [-18, 0],
+        [0, 18],
+        [0, -18],
+      ]) {
+        const x = p.x + dx,
+          y = p.y + dy;
+        if (x < rect.x + 30 || x > rect.right - 80 || y < rect.y + 90 || y > rect.bottom - 60)
+          continue;
+        const nearest = points
+          .filter((q) => Math.abs(q.x - x) <= 22 && Math.abs(q.y - y) <= 22)
+          .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
+        if (nearest === p && document.elementFromPoint(x, y)?.closest('.marker'))
+          return { id: p.el.dataset.id, x, y };
+      }
+  });
+  assert.ok(edge, 'an enlarged target edge is required');
+  await page.touchscreen.tap(edge.x, edge.y);
+  await total(1);
+  assert.equal(
+    await page.locator('.marker[data-id="' + edge.id + '"]').getAttribute('aria-pressed'),
+    'true',
+  );
+  await page.screenshot({ path: resolve(screenshots, 'touch-map.png') });
+});
+test('drawer restores its scrim, focus and inert state across layout changes', async () => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(url);
+  await ready();
+  await page.locator('#mobile-filters').click();
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await until(async () => await page.locator('#sidebar-scrim').evaluate((el) => el.hidden));
+  assert.equal(await page.locator('.main').evaluate((el) => el.inert), false);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await until(async () => await page.locator('#sidebar-scrim').isVisible());
+  assert.equal(await page.locator('.main').evaluate((el) => el.inert), true);
+  assert.equal(await page.locator('#mobile-filters').getAttribute('aria-expanded'), 'true');
+  await page.locator('#sidebar-scrim').click({ position: { x: 380, y: 200 } });
+  assert.equal(await page.locator('.main').evaluate((el) => el.inert), false);
+  assert.equal(await page.locator('#sidebar').evaluate((el) => el.inert), true);
+  assert.equal(
+    await page.locator('#mobile-filters').evaluate((el) => el === document.activeElement),
+    true,
+  );
+});
+test('bulk cross-tab synchronization batches reads and only rewrites changed symbols', async () => {
+  await page.goto(url);
+  await ready();
+  const second = await context.newPage();
+  await second.goto(url);
+  await second.waitForFunction(
+    () => document.querySelector('#map-status').textContent === '澳洲大陆',
+  );
+  await page.evaluate(() => {
+    window.syncAudit = { reads: 0, symbols: 0 };
+    const original = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key) {
+      if (key.startsWith(window.FH3Progress.prefix)) window.syncAudit.reads++;
+      return original.call(this, key);
+    };
+    new MutationObserver((records) => {
+      window.syncAudit.symbols += records.filter(
+        (r) => r.type === 'childList' && r.target.matches?.('.marker-symbol'),
+      ).length;
+    }).observe(document.querySelector('#markers'), { childList: true, subtree: true });
+  });
+  const ids = await second.evaluate(() => window.FH3_DATA.points.map((p) => p[0]));
+  await importProgress(ids, false, second);
+  await total(235);
+  const audit = await page.evaluate(() => window.syncAudit);
+  assert.equal(audit.symbols, 235);
+  assert.ok(audit.reads < 235 * 20, 'storage events were not batched: ' + audit.reads + ' reads');
+  console.log('Bulk sync: ' + audit.reads + ' storage reads, ' + audit.symbols + ' symbol updates');
+});
