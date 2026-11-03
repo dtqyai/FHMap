@@ -7,9 +7,7 @@ const root = resolve(fileURLToPath(new URL('../', import.meta.url))),
 if (existsSync(out) && !existsSync(join(out, 'fh3-local-map.json')))
   throw new Error('dist 已存在且不是本项目的构建输出，请另选目录。');
 const context = { window: {} };
-runInNewContext(readFileSync(join(root, 'data.js'), 'utf8'), context);
 runInNewContext(readFileSync(join(root, 'maps.js'), 'utf8'), context);
-runInNewContext(readFileSync(join(root, 'games.js'), 'utf8'), context);
 if (existsSync(out)) rmSync(out, { recursive: true });
 mkdirSync(join(out, 'assets'), { recursive: true });
 for (const name of [
@@ -20,14 +18,11 @@ for (const name of [
   'tiles.js',
   'data.js',
   'maps.js',
-  'games.js',
   'fh3-local-map.json',
 ])
   copyFileSync(join(root, name), join(out, name));
 copyFileSync(join(root, 'assets/favicon.svg'), join(out, 'assets/favicon.svg'));
-for (const config of Object.values(context.window.FH_GAMES).flatMap((game) =>
-  Object.values(game.maps),
-)) {
+for (const config of Object.values(context.window.FH3_MAPS)) {
   const target = join(out, config.tiles.base);
   mkdirSync(resolve(target, '..'), { recursive: true });
   cpSync(join(root, config.tiles.base), target, { recursive: true });

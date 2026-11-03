@@ -3,9 +3,7 @@ window.FH3Progress = (() => {
   'use strict';
   const prefix = 'fh3.collect.v1.',
     revisionPrefix = 'fh3.collect.revision.v1.';
-  function create(ids, getStorage = () => localStorage, game = 'fh3') {
-    const prefix = game + '.collect.v1.',
-      revisionPrefix = game + '.collect.revision.v1.';
+  function create(ids, getStorage = () => localStorage) {
     const valid = new Set(ids),
       writer = globalThis.crypto?.randomUUID?.() || Date.now() + ':' + Math.random();
     let sequence = 0;
@@ -92,7 +90,7 @@ window.FH3Progress = (() => {
       }
       return commit(changes);
     }
-    return { prefix, revisionPrefix, read, set, import: importProgress, undo };
+    return { read, set, import: importProgress, undo };
   }
   return { prefix, revisionPrefix, create };
 })();

@@ -1,6 +1,5 @@
 :root {
   --topbar-height: 76px;
-  --game-nav-height: 46px;
   color-scheme: dark;
   --bg: #141b24;
   --panel: #19222d;
@@ -117,7 +116,7 @@ button:disabled {
   border-radius: 50%;
 }
 .workspace {
-  height: calc(100dvh - var(--topbar-height) - var(--game-nav-height));
+  height: calc(100dvh - var(--topbar-height));
   display: flex;
 }
 .sidebar {
@@ -762,42 +761,6 @@ input[type='checkbox'] {
   border: 0;
   display: block;
 }
-.game-nav {
-  height: var(--game-nav-height);
-  padding: 0 25px;
-  background: #141b24;
-  border-bottom: 1px solid var(--line);
-}
-.game-tabs {
-  display: flex;
-  align-items: stretch;
-  gap: 24px;
-  height: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.game-tabs button {
-  position: relative;
-  flex: none;
-  padding: 0 3px;
-  white-space: nowrap;
-  color: #8a98a9;
-  font-size: 13px;
-  font-weight: 600;
-}
-.game-tabs button[aria-selected='true'] {
-  color: var(--text);
-}
-.game-tabs button[aria-selected='true']:after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: var(--pink);
-}
 @media (min-height: 1000px) {
   .sidebar {
     padding-top: 32px;
@@ -841,7 +804,6 @@ input[type='checkbox'] {
 @media (max-width: 760px) {
   :root {
     --topbar-height: 65px;
-    --game-nav-height: 44px;
   }
   .topbar {
     padding: 0 16px;
@@ -861,7 +823,7 @@ input[type='checkbox'] {
   .sidebar {
     position: fixed;
     left: 0;
-    top: calc(var(--topbar-height) + var(--game-nav-height));
+    top: var(--topbar-height);
     bottom: 0;
     width: 294px;
     max-width: 90vw;
@@ -875,7 +837,7 @@ input[type='checkbox'] {
   }
   .sidebar-scrim {
     position: fixed;
-    inset: calc(var(--topbar-height) + var(--game-nav-height)) 0 0;
+    inset: var(--topbar-height) 0 0;
     background: #050c1780;
     z-index: 10;
     backdrop-filter: blur(2px);
@@ -957,15 +919,6 @@ input[type='checkbox'] {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 10px;
-  }
-  .game-nav {
-    padding: 0 16px;
-  }
-  .game-tabs {
-    gap: 18px;
-  }
-  .game-tabs button {
-    font-size: 12px;
   }
 }
 @media (max-height: 760px) and (min-width: 761px) {

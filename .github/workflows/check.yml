@@ -27,11 +27,10 @@ jobs:
           node --check progress.js
           node --check data.js
           node --check maps.js
-          node --check games.js
           node --check scripts/build-site.mjs
           node --check scripts/verify-data.mjs
       - name: Check Python syntax
-        run: python3 -c "import ast,pathlib; [ast.parse(p.read_text()) for p in pathlib.Path('scripts').glob('*.py')]"
+        run: python3 -c "import ast,pathlib; ast.parse(pathlib.Path('scripts/build-tiles.py').read_text())"
       - name: Verify points and map tiles
         run: node scripts/verify-data.mjs
       - name: Test progress transactions
