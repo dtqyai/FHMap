@@ -1,9 +1,10 @@
 (() => {
   'use strict';
-  const { types, points } = window.FH3_DATA;
-  const mapConfigs = window.FH3_MAPS;
+  const games = window.FH_GAMES;
+  let game = 'fh3';
+  let { types, points } = games[game].data;
+  const mapConfigs = Object.assign({}, ...Object.values(games).map((entry) => entry.maps));
   const $ = (id) => document.getElementById(id);
-  const { prefix: PREFIX, revisionPrefix: REVISION_PREFIX } = window.FH3Progress;
   const touchTargets = matchMedia('(pointer: coarse)');
   const regions = {};
   for (const [key, config] of Object.entries(mapConfigs)) {
@@ -46,35 +47,41 @@
       return svg('<path d="M3 7h5l2-3h4l2 3h5v13H3Z"/><circle cx="12" cy="13" r="4"/>');
     return key;
   }
-  for (const [id, type, x, y] of points) {
-    const key = types[type].region,
-      config = mapConfigs[key];
-    const [imageX, imageY] = imagePoint(key, x, y),
-      [cx, cy] = config.crop,
-      [ox, oy] = config.position;
-    const p = {
-      id,
-      type,
-      x: ox + (imageX - cx) * config.unit,
-      y: oy + (imageY - cy) * config.unit,
-      region: key,
-    };
-    byId.set(id, p);
-    const button = document.createElement('button');
-    button.className = 'marker';
-    button.dataset.id = id;
-    button.style.setProperty('--color', types[type].color);
-    button.innerHTML = '<span class="marker-symbol" aria-hidden="true">' + icon(type) + '</span>';
-    button.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (suppressClick && e.detail !== 0) return;
-      const target = touchTargets.matches && e.detail !== 0 ? nearestMarker(e, id) : id;
-      setCollected(target, !collected.has(target));
-    });
-    p.el = button;
-    $('markers').append(button);
+  function buildMarkers() {
+    byId.clear();
+    $('markers').replaceChildren();
+    for (const [id, type, x, y, label] of points) {
+      const key = types[type].region,
+        config = mapConfigs[key];
+      const [imageX, imageY] = imagePoint(key, x, y),
+        [cx, cy] = config.crop,
+        [ox, oy] = config.position;
+      const p = {
+        id,
+        type,
+        x: ox + (imageX - cx) * config.unit,
+        y: oy + (imageY - cy) * config.unit,
+        region: key,
+        label: game === 'fh3' ? '' : label,
+      };
+      byId.set(id, p);
+      const button = document.createElement('button');
+      button.className = 'marker';
+      button.dataset.id = id;
+      button.style.setProperty('--color', types[type].color);
+      button.innerHTML = '<span class="marker-symbol" aria-hidden="true">' + icon(type) + '</span>';
+      button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (suppressClick && e.detail !== 0) return;
+        const target = touchTargets.matches && e.detail !== 0 ? nearestMarker(e, id) : id;
+        setCollected(target, !collected.has(target));
+      });
+      p.el = button;
+      $('markers').append(button);
+    }
   }
-  const progress = window.FH3Progress.create([...byId.keys()]);
+  buildMarkers();
+  let progress = window.FH3Progress.create([...byId.keys()], undefined, game);
   function updateSaveStatus(ok, reason = '') {
     $('save-status').classList.toggle('error-state', !ok);
     $('save-status').replaceChildren();
@@ -163,6 +170,7 @@
         done === 0 ? 0 : done === points.length ? 100 : ((done / points.length) * 100).toFixed(1),
       current = regionPoints();
     $('total-done').textContent = done;
+    $('total-count').textContent = '/ ' + points.length;
     $('total-percent').textContent = percent + '%';
     $('total-bar').style.width = percent + '%';
     $('remaining').textContent = '未收集 ' + (points.length - done) + ' 个';
@@ -178,14 +186,14 @@
       p.el.classList.toggle('done', checked);
       p.el.setAttribute(
         'aria-label',
-        types[p.type].name +
-          ' ' +
-          number(p.id) +
+        (p.label || types[p.type].name + ' ' + number(p.id)) +
           '，' +
           (checked ? '已收集，点击取消' : '未收集，点击收集'),
       );
       p.el.setAttribute('aria-pressed', String(checked));
-      p.el.title = types[p.type].name + ' ' + number(p.id) + (checked ? ' · 已收集' : ' · 未收集');
+      p.el.title =
+        (p.label || types[p.type].name + ' ' + number(p.id)) +
+        (checked ? ' · 已收集' : ' · 未收集');
       p.el.firstElementChild.innerHTML = checked ? '✓' : icon(p.type);
     }
     for (const button of $('categories').children) {
@@ -301,10 +309,80 @@
     for (const b of $('regions').children)
       b.setAttribute('aria-pressed', String(b.dataset.region === region));
     tiles.show(region);
+    updateSources();
     buildCategories();
     fitMap();
     render();
   }
+  function updateSources() {
+    const source =
+      game === 'fh3'
+        ? { name: 'KudosPrime', url: games[game].data.source }
+        : mapConfigs[region].pointSource;
+    $('point-source').href = source.url;
+    $('point-source').textContent = source.name + ' ↗';
+    const extra = mapConfigs[region].additionalPointSource;
+    $('point-source-extra').hidden = !extra;
+    if (extra) {
+      const link = $('point-source-extra').querySelector('a');
+      link.href = extra.url;
+      link.textContent = extra.name + ' ↗';
+    }
+    $('image-source').hidden = game !== 'fh3';
+    $('image-credit-local').hidden = game === 'fh3';
+  }
+  function changeGame(next) {
+    if (game === next) return;
+    game = next;
+    ({ types, points } = games[game].data);
+    enabledTypes.clear();
+    Object.keys(types).forEach((key) => enabledTypes.add(Number(key)));
+    collected.clear();
+    status = 'all';
+    undo = null;
+    clearTimeout(toastTimer);
+    $('toast').hidden = true;
+    buildMarkers();
+    progress = window.FH3Progress.create([...byId.keys()], undefined, game);
+    if (loadProgress()) updateSaveStatus(true);
+    $('regions').replaceChildren();
+    for (const [key, config] of Object.entries(games[game].maps)) {
+      const button = document.createElement('button');
+      button.dataset.region = key;
+      const title = document.createElement('span'),
+        tag = document.createElement('small');
+      title.textContent = config.name;
+      tag.textContent = config.tag || (key === 'main' ? '本体' : 'DLC');
+      button.append(title, tag);
+      $('regions').append(button);
+    }
+    for (const button of $('games').children) {
+      const selected = button.dataset.game === game;
+      button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    $('game-panel').setAttribute('aria-labelledby', 'game-' + game + '-tab');
+    changeRegion(Object.keys(games[game].maps)[0]);
+    zoom(1.8);
+  }
+  $('games').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-game]');
+    if (button) changeGame(button.dataset.game);
+  });
+  $('games').addEventListener('keydown', (event) => {
+    const buttons = [...$('games').children],
+      index = buttons.indexOf(event.target);
+    if (index < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? buttons.length - 1
+          : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next].focus();
+    changeGame(buttons[next].dataset.game);
+  });
   function syncSidebar() {
     const mobile = innerWidth <= 760,
       open = $('sidebar').classList.contains('open');
@@ -535,10 +613,10 @@
   });
   function backupObject() {
     return {
-      app: 'fh3-local-map',
+      app: game + '-local-map',
       version: 1,
       exportedAt: new Date().toISOString(),
-      source: window.FH3_DATA.source,
+      source: games[game].data.source,
       total: points.length,
       collected: [...collected].sort((a, b) => a - b),
     };
@@ -568,7 +646,8 @@
     $('replace-progress').checked = false;
     $('backup-content').readOnly = mode === 'export';
     $('backup-content').value = mode === 'export' ? JSON.stringify(backupObject(), null, 2) : '';
-    $('backup-content').placeholder = mode === 'import' ? '粘贴 FH3 收集地图导出的 JSON 备份…' : '';
+    $('backup-content').placeholder =
+      mode === 'import' ? '粘贴 ' + games[game].name + ' 导出的 JSON 备份…' : '';
     $('backup-submit').textContent = mode === 'export' ? '下载 JSON 备份' : '合并进度';
     $('backup-error').hidden = true;
     $('import-file').value = '';
@@ -612,7 +691,8 @@
         url = URL.createObjectURL(blob),
         link = document.createElement('a');
       link.href = url;
-      link.download = 'FH3-收集进度-' + new Date().toISOString().slice(0, 10) + '.json';
+      link.download =
+        game.toUpperCase() + '-收集进度-' + new Date().toISOString().slice(0, 10) + '.json';
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
       return;
@@ -623,11 +703,11 @@
       data = JSON.parse($('backup-content').value);
       if (
         !data ||
-        data.app !== 'fh3-local-map' ||
+        data.app !== game + '-local-map' ||
         data.version !== 1 ||
         !Array.isArray(data.collected)
       )
-        throw new Error('备份格式不匹配。请选择 FH3 收集地图导出的版本 1 备份。');
+        throw new Error('备份格式不匹配。请选择 ' + games[game].name + ' 导出的版本 1 备份。');
       if (
         data.collected.length > points.length ||
         new Set(data.collected).size !== data.collected.length ||
@@ -672,7 +752,11 @@
     });
   }
   window.addEventListener('storage', (e) => {
-    if (e.key === null || e.key.startsWith(PREFIX) || e.key.startsWith(REVISION_PREFIX))
+    if (
+      e.key === null ||
+      e.key.startsWith(progress.prefix) ||
+      e.key.startsWith(progress.revisionPrefix)
+    )
       scheduleProgressSync();
   });
   window.addEventListener('focus', scheduleProgressSync);

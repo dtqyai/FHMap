@@ -1,8 +1,18 @@
-# Forza Horizon 3 Interactive Map
+# Forza Horizon Interactive Map
 
-Forza Horizon 3 收集地图，包含澳洲大陆 183 个点位、暴风雪山 26 个点位、风火轮 26 个点位。
+支持 Forza Horizon 2 和 Forza Horizon 3，通过作品选项卡切换，默认打开 FH3。
 
-各点位独立显示，点击点位直接切换收集状态。支持按类型和状态筛选、拖动缩放、进度导入/导出。进度保存在浏览器 localStorage，无需账号或后端。
+| 作品 | 区域 | 点位 |
+| --- | --- | ---: |
+| Forza Horizon 2 | 法国与意大利 | 240 |
+| Forza Horizon 2 | 风暴岛 | 26 |
+| Forza Horizon 3 | 澳洲大陆 | 183 |
+| Forza Horizon 3 | 暴风雪山 | 26 |
+| Forza Horizon 3 | 风火轮 | 26 |
+
+FH2 法国与意大利包含 50 块快速移动广告牌、100 块 XP 广告牌、10 处车房宝物、30 处测速照相、15 处测速区间，以及《速度与激情》的 20 块奖励广告牌、10 处测速照相、5 处测速区间。风暴岛目前收录 25 块奖励广告牌和 1 处车房宝物。
+
+各点位独立显示，点击点位直接切换收集状态。支持按类型和状态筛选、拖动缩放、进度导入/导出。进度保存在浏览器 localStorage，无需账号或后端。两部作品的标记和 JSON 备份相互独立，导入时会校验作品；原有 FH3 进度和版本 1 备份继续兼容。
 
 ## 本地运行
 
@@ -27,8 +37,8 @@ python3 -m http.server 8763 --bind 127.0.0.1
 | `index.html`、`style.css`、`app.js` | 页面、筛选与地图交互，无第三方运行依赖 |
 | `tiles.js`、`progress.js` | 瓦片加载/恢复与进度事务/回滚 |
 | `tests/` | 存储单元测试与浏览器回归测试 |
-| `data.js`、`maps.js` | 原站点位及高清地图配置 |
-| `assets/maps/` | 360 块运行所需的多级 WebP 瓦片，约 19.3 MB |
+| `data.js`、`maps.js`、`data-fh2.js`、`maps-fh2.js`、`games.js` | 点位、高清地图配置及作品列表 |
+| `assets/maps/` | 574 块运行所需的多级 WebP 瓦片，约 31.1 MB |
 | `assets/favicon.svg` | 页面图标 |
 | `source/` | 点位提取记录、配准结果、构建统计与缓存配置 |
 | `source/reference/` | 核对来源所用的旧底图与原站样式，不被页面加载 |
@@ -37,12 +47,12 @@ python3 -m http.server 8763 --bind 127.0.0.1
 
 以下目录由 `.gitignore` 排除：
 
-- `source/originals/`：三张原始高清 PNG，合计约 239 MB，仅本地保留。
+- `source/originals/`：五张原始高清 PNG，仅本地保留；保存的 KudosPrime 网页及资源文件夹也留在此处。
 - `dist/`：构建输出，避免重复提交瓦片。
 - `verification/`：本地验证截图、备份样本及历史记录。
 - 除根目录 `README.md` 之外的 Markdown 文档、本地启动器、环境文件、缓存、日志和系统文件。
 
-克隆仓库后即可运行和构建，无需三张原始 PNG。
+克隆仓库后即可运行和构建，无需原始 PNG 或保存的网页。
 
 ## 校验与构建
 
@@ -66,7 +76,7 @@ npm run test:browser
 npm run format:check
 ```
 
-浏览器测试运行构建后的 `dist/`，覆盖加载失败后的自动/手动/联网恢复、标记独立显示、拖动与点击、快捷键、备份下载、导入/替换/撤销、存储失败回滚、跨标签页同步和批量刷新、键盘焦点导航、请求挂起超时、手机触摸命中及宽窄屏切换。截图写入本地 `verification/`。
+浏览器测试运行构建后的 `dist/`，覆盖加载失败后的自动/手动/联网恢复、标记独立显示、拖动与点击、快捷键、备份下载、导入/替换/撤销、存储失败回滚、跨标签页同步和批量刷新、键盘焦点导航、请求挂起超时、手机触摸命中及宽窄屏切换。FH2 测试还覆盖作品切换、相同编号的进度隔离、跨作品备份校验、FH3 图标复用及未选地图不加载。截图写入本地 `verification/`。
 
 GitHub Actions 在推送和拉取请求时执行格式、语法、数据校验、存储测试、静态包构建和浏览器回归测试。
 
@@ -88,7 +98,7 @@ GitHub Actions 在推送和拉取请求时执行格式、语法、数据校验�
 | 根目录 | `/` |
 | 构建监视包括路径 | `*` |
 
-GitHub 的 `Validate map` 只负责校验和构建，不会自行发布到 Cloudflare。自动发布由 Cloudflare 的 Git 集成触发；若控制台提示 Git 帐户已断开，需要恢复 Cloudflare Workers and Pages 对此仓库的授权后再部署。
+GitHub 的 `Validate map` 只负责校验和构建，不会自行发布到 Cloudflare。原 Worker 已删除；仓库保留此配置供之后重新创建，当前没有执行生产部署。重新接入 Cloudflare Git 集成后，才会由 Cloudflare 触发自动发布。
 
 ## 重新生成瓦片
 
@@ -97,19 +107,28 @@ GitHub 的 `Validate map` 只负责校验和构建，不会自行发布到 Cloud
 - `Australia.png`
 - `Blizzard Mountain.png`
 - `Hot Wheels Thrilltopia.png`
+- `France & Italy.png`
+- `Storm Island.png`
 
 安装 Python 的 Pillow 后运行：
 
 ```sh
-python3 scripts/build-tiles.py
+python3 scripts/build-tiles.py  # FH3
+python3 scripts/build-fh2.py    # FH2
 node scripts/verify-data.mjs --source-images
 node scripts/build-site.mjs
 ```
 
-`--source-images` 要求三张 PNG 均存在并校验尺寸；普通校验在没有原图时仍会校验点位、配准参数和全部瓦片。本地原图不上传，`maps.js` 和生成的 WebP 瓦片需要提交。
+`--source-images` 要求五张 PNG 均存在并校验尺寸；普通校验在没有原图时仍会校验点位、配准参数和全部瓦片。本地原图不上传，`maps.js`、`maps-fh2.js`、`data-fh2.js` 和生成的 WebP 瓦片需要提交。FH2 脚本使用 `source/fh2-extracted-points.json`、`source/fh2-storm-points.json` 和已记录的配准矩阵，不需要重新访问来源网站。
 
 ## 数据与图片来源
 
-点位来自 [KudosPrime FH3 地图](https://www.kudosprime.com/fh3/gamemap.php)，提取日期为 2026-10-21，保留原站 ID、类别、源坐标和提示。原站没有 #145，实际为 235 个点位；未逐点进入游戏核验。
+FH3 点位来自 [KudosPrime FH3 地图](https://www.kudosprime.com/fh3/gamemap.php)，提取日期为 2026-10-21，保留原站 ID、类别、源坐标和提示。原站没有 #145，实际为 235 个点位；未逐点进入游戏核验。
 
-底图来自 [The Spriters Resource 的 Forza Horizon 3 页面](https://www.spriters-resource.com/xbox_one/forzahorizon3/)，使用用户提供的三张高清 PNG；Australia 图署名为 Trekeln。暴风雪山高清瓦片保留最初地图的朝向，点位使用同一参考坐标系；原始 PNG 保持不变。Forza Horizon 为 Microsoft 的商标。
+FH3 底图来自 [The Spriters Resource 的 Forza Horizon 3 页面](https://www.spriters-resource.com/xbox_one/forzahorizon3/)，使用用户提供的三张高清 PNG；Australia 图署名为 Trekeln。暴风雪山高清瓦片保留最初地图的朝向，点位使用同一参考坐标系；原始 PNG 保持不变。Forza Horizon 为 Microsoft 的商标。
+
+FH2 法国与意大利点位来自 [KudosPrime Xbox One 地图](https://www.kudosprime.com/fh2xo/gamemap.php)，提取日期为 2026-11-03。读取用户保存的完整网页，保留全部 240 个点位的原站 ID、类别和图标中心坐标，包含《速度与激情》的 35 个点位。只提交必要的点位记录，不上传保存的网页、广告脚本或用户属性。FH2 复用 FH3 的 SVG 及文字标记样式，筛选列表和地图使用相同图标，不使用 KudosPrime 的位图图标。
+
+KudosPrime 保存页没有风暴岛点位。风暴岛奖励广告牌坐标从 [Maka91 的完整点位图（XboxAchievements 托管）](https://www.xboxachievements.com/game/forza-horizon-2-xbox-one/guide/)中的 25 个蓝色标记中心提取；车房位置取自 [Classy Tech Calibrations 的攻略视频末尾](https://www.youtube.com/watch?v=Oug_58zd9dM&t=54)。参考图片、取点方式及配准结果保存在 `source/reference/fh2-*`、`source/fh2-storm-points.json` 和 `source/fh2-map-calibration.json`。风暴岛编号从 10001 起，属于本项目编号。
+
+FH2 底图使用用户提供的 `France & Italy.png`、`Storm Island.png`，保持原图朝向。通过地形特征配准至来源点位坐标，法国与意大利、风暴岛分别有 5485、4395 个配准内点，95% 残差分别约为高清原图的 2.1、2.7 像素。坐标来自公开地图及视频画面，未逐点进入游戏核验。

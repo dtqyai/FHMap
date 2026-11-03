@@ -1,0 +1,18 @@
+{
+  "fh2-main": {
+    "sourceSHA256": "9b914b8e15ab1b35dfdd033d5dba3c9466b0ec680b1413ecdbc8b44164e13935",
+    "sourceBytes": 49662092,
+    "tileCount": 130,
+    "tileBytes": 7573148,
+    "largestTileBytes": 122282,
+    "previewBytes": 17182
+  },
+  "fh2-storm": {
+    "sourceSHA256": "98317233ff4db518362efb5079c7e038dc3e99edab1c7562647cb32021f0a6d6",
+    "sourceBytes": 48094494,
+    "tileCount": 84,
+    "tileBytes": 4242744,
+    "largestTileBytes": 81958,
+    "previewBytes": 11010
+  }
+}

@@ -225,8 +225,7 @@ test('preview and detail tiles automatically recover from temporary HTTP failure
   assert.ok([...attempts.values()].every((n) => n >= 3));
   assert.equal(
     await page
-      .locator('.map-preview')
-      .first()
+      .locator('.map-layer[data-region="main"] .map-preview')
       .evaluate((el) => el.naturalWidth > 0),
     true,
   );
@@ -729,4 +728,160 @@ test('bulk cross-tab synchronization batches reads and only rewrites changed sym
   assert.equal(audit.symbols, 235);
   assert.ok(audit.reads < 235 * 20, 'storage events were not batched: ' + audit.reads + ' reads');
   console.log('Bulk sync: ' + audit.reads + ' storage reads, ' + audit.symbols + ' symbol updates');
+});
+
+test('FH2 tabs load only the selected map and reuse FH3 icons and all category counts', async () => {
+  const images = [],
+    errors = [];
+  page.on('request', (request) => {
+    if (request.resourceType() === 'image') images.push(request.url());
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto(url);
+  await ready();
+  assert.equal(await page.title(), 'Forza Horizon Interactive Map');
+  assert.equal(await page.locator('.brand strong').textContent(), 'Forza Horizon Interactive Map');
+  assert.equal(
+    images.some((url) => url.includes('/fh2-')),
+    false,
+  );
+  const fh3TravelIcon = await page
+    .locator('.category[data-type="1"] svg')
+    .evaluate((el) => el.outerHTML);
+  const fh3BarnIcon = await page
+    .locator('.category[data-type="5"] svg')
+    .evaluate((el) => el.outerHTML);
+  await page.locator('[data-game="fh2"]').click();
+  await until(async () => (await page.locator('#map-status').textContent()) === '法国与意大利');
+  assert.equal(await page.locator('#total-count').textContent(), '/ 266');
+  assert.equal(await page.locator('.marker:not([hidden])').count(), 240);
+  assert.equal(await page.locator('#categories button').count(), 8);
+  assert.deepEqual(await page.locator('.category-count').allTextContents(), [
+    '0 / 50',
+    '0 / 100',
+    '0 / 10',
+    '0 / 30',
+    '0 / 15',
+    '0 / 20',
+    '0 / 10',
+    '0 / 5',
+  ]);
+  assert.equal(
+    images.some((url) => url.includes('/fh2-storm/')),
+    false,
+  );
+  const travelIcons = await page
+    .locator('.category[data-type="1"] svg, .marker[data-id="5"] svg')
+    .evaluateAll((elements) => elements.map((el) => el.outerHTML));
+  assert.deepEqual(travelIcons, [fh3TravelIcon, fh3TravelIcon]);
+  assert.equal(
+    await page.locator('.category[data-type="3"] svg').evaluate((el) => el.outerHTML),
+    fh3BarnIcon,
+  );
+  assert.equal(await page.locator('.source-sprite').count(), 0);
+  await page.locator('button[data-region="fh2-storm"]').click();
+  await until(async () => (await page.locator('#map-status').textContent()) === '风暴岛');
+  assert.equal(await page.locator('.marker:not([hidden])').count(), 26);
+  assert.deepEqual(await page.locator('.category-count').allTextContents(), ['0 / 25', '0 / 1']);
+  assert.equal(await page.locator('#point-source-extra').isVisible(), true);
+  await page.locator('#toggle-types').click();
+  assert.equal(await page.locator('.marker:not([hidden])').count(), 0);
+  assert.equal(await page.locator('#toast').isVisible(), false);
+  assert.equal(
+    images.some((url) => /\.png(?:\?|$)/i.test(url)),
+    false,
+  );
+  assert.ok(Number(await page.locator('#map').getAttribute('data-max-active-requests')) <= 4);
+  assert.deepEqual(errors, []);
+});
+
+test('FH2 and FH3 keep independent progress for overlapping IDs through switching and reload', async () => {
+  await page.goto(url);
+  await ready();
+  await page.locator('[data-game="fh2"]').click();
+  await page.locator('.marker[data-id="3"]').focus();
+  await page.keyboard.press('Enter');
+  await total(1);
+  assert.equal(await page.locator('#toast').isVisible(), false);
+  assert.equal(await page.evaluate(() => localStorage.getItem('fh2.collect.v1.3')), '1');
+  assert.equal(await page.evaluate(() => localStorage.getItem('fh3.collect.v1.3')), null);
+  await page.locator('[data-game="fh3"]').click();
+  await total(0);
+  await page.locator('.marker[data-id="3"]').focus();
+  await page.keyboard.press('Enter');
+  await total(1);
+  await page.locator('[data-game="fh2"]').click();
+  await total(1);
+  await page.locator('.marker[data-id="3"]').focus();
+  await page.keyboard.press('Enter');
+  await total(0);
+  await page.reload();
+  await ready();
+  await total(1);
+  await page.locator('[data-game="fh2"]').click();
+  await total(0);
+  assert.equal(await page.locator('.marker[data-id="3"]').getAttribute('aria-pressed'), 'false');
+});
+
+test('FH2 backups include both regions and cannot import progress into FH3', async () => {
+  await page.goto(url);
+  await ready();
+  await page.locator('[data-game="fh2"]').click();
+  await page.locator('#import-button').click();
+  await page.locator('#backup-content').fill(
+    JSON.stringify({
+      app: 'fh2-local-map',
+      version: 1,
+      collected: [3, 10001, 10026],
+    }),
+  );
+  await page.locator('#backup-submit').click();
+  await total(3);
+  await page.locator('#export-button').click();
+  const backup = JSON.parse(await page.locator('#backup-content').inputValue());
+  assert.equal(backup.app, 'fh2-local-map');
+  assert.equal(backup.total, 266);
+  assert.deepEqual(backup.collected, [3, 10001, 10026]);
+  const downloading = page.waitForEvent('download');
+  await page.locator('#backup-submit').click();
+  assert.match((await downloading).suggestedFilename(), /^FH2-收集进度-/);
+  await page.locator('#close-backup').click();
+  await page.locator('[data-game="fh3"]').click();
+  await page.locator('#import-button').click();
+  await page.locator('#backup-content').fill(JSON.stringify(backup));
+  await page.locator('#backup-submit').click();
+  assert.match(await page.locator('#backup-error').textContent(), /Forza Horizon 3/);
+  await total(0);
+});
+
+test('game tabs support keyboard navigation and FH2 fits desktop and mobile layouts', async () => {
+  await page.goto(url);
+  await ready();
+  await page.locator('[data-game="fh3"]').focus();
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.locator('[data-game="fh2"]').getAttribute('aria-selected'), 'true');
+  assert.equal(await page.locator('#game-panel').getAttribute('aria-labelledby'), 'game-fh2-tab');
+  for (const [name, width, height] of [
+    ['desktop', 1440, 900],
+    ['mobile', 390, 844],
+  ]) {
+    await page.setViewportSize({ width, height });
+    for (const region of ['fh2-main', 'fh2-storm']) {
+      await page.locator('button[data-region="' + region + '"]').click();
+      await until(async () => (await page.locator('#map').getAttribute('aria-busy')) === 'false');
+      await page.screenshot({ path: resolve(screenshots, 'fh2-' + region + '-' + name + '.png') });
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+        false,
+      );
+    }
+    if (name === 'mobile') {
+      await page.locator('button[data-region="fh2-main"]').click();
+      await page.locator('#mobile-filters').click();
+      await until(async () => (await page.locator('#sidebar').boundingBox()).x >= 0);
+      assert.equal(await page.locator('#categories button').count(), 8);
+      await page.screenshot({ path: resolve(screenshots, 'fh2-mobile-filters.png') });
+      await page.locator('#close-sidebar').click();
+    }
+  }
 });

@@ -124,3 +124,91 @@ console.log(
     ' / 3' +
     (checkedSourceImages < 3 ? ' (optional; source/originals/ is not versioned)' : ''),
 );
+
+// FH2 keeps the saved KudosPrime IDs, including the three Fast & Furious categories.
+runInNewContext(readFileSync(new URL('data-fh2.js', root), 'utf8'), context);
+runInNewContext(readFileSync(new URL('maps-fh2.js', root), 'utf8'), context);
+runInNewContext(readFileSync(new URL('games.js', root), 'utf8'), context);
+const fh2 = context.window.FH2_DATA,
+  fh2Maps = context.window.FH2_MAPS,
+  fh2Source = JSON.parse(readFileSync(new URL('source/fh2-extracted-points.json', root))),
+  storm = JSON.parse(readFileSync(new URL('source/fh2-storm-points.json', root))),
+  fh2Cal = JSON.parse(readFileSync(new URL('source/fh2-map-calibration.json', root)));
+assert.deepEqual(Object.keys(context.window.FH_GAMES), ['fh2', 'fh3']);
+assert.equal(fh2Source.markers.length, 240);
+assert.equal(storm.boards.length, 25);
+assert.equal(fh2.points.length, 266);
+assert.ok(storm.barn.inliers > 100);
+assert.ok(storm.barn.p95Residual < 3);
+assert.equal(new Set(fh2.points.map((p) => p[0])).size, fh2.points.length);
+const fh2ById = new Map(fh2.points.map((p) => [p[0], p]));
+for (const p of fh2Source.markers) {
+  const actual = fh2ById.get(p.id);
+  assert.ok(actual, 'Missing KudosPrime FH2 ID ' + p.id);
+  assert.equal(actual[1], p.type);
+  assert.equal(actual[2], p.left + p.width / 2);
+  assert.equal(actual[3], p.top + p.height / 2);
+}
+for (const p of storm.boards) {
+  const actual = fh2ById.get(p.id);
+  assert.equal(actual[1], 20);
+  assert.equal(actual[2], p.x);
+  assert.equal(actual[3], p.y);
+}
+if (storm.barn) {
+  const actual = fh2ById.get(storm.barn.id);
+  assert.equal(actual[1], 21);
+  assert.equal(actual[2], storm.barn.x);
+  assert.equal(actual[3], storm.barn.y);
+}
+for (const [type, item] of Object.entries(fh2.types)) {
+  assert.equal(fh2.points.filter((p) => p[1] === Number(type)).length, item.total);
+}
+let fh2Tiles = 0,
+  fh2Bytes = 0,
+  fh2Largest = 0;
+for (const [key, config] of Object.entries(fh2Maps)) {
+  const cal = fh2Cal[key];
+  assert.equal(JSON.stringify(config.oldToImage), JSON.stringify(cal.oldToImage));
+  assert.ok(cal.inliers > 1000);
+  assert.ok(cal.p95Residual < 5);
+  const sourceImage = new URL('source/originals/' + config.sourceImage, root);
+  if (existsSync(sourceImage)) {
+    const header = Buffer.alloc(24),
+      fd = openSync(sourceImage, 'r');
+    try {
+      assert.equal(readSync(fd, header, 0, 24, 0), 24);
+    } finally {
+      closeSync(fd);
+    }
+    assert.equal(header.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+    assert.equal(header.readUInt32BE(16), config.width);
+    assert.equal(header.readUInt32BE(20), config.height);
+  } else assert.ok(!requireSourceImages, 'Missing original source image: ' + config.sourceImage);
+  const [cx, cy, cw, ch] = config.crop,
+    [a, b] = config.oldToImage;
+  for (const [id, type, x, y] of fh2.points) {
+    if (fh2.types[type].region !== key) continue;
+    const px = a[0] * x + a[1] * y + a[2],
+      py = b[0] * x + b[1] * y + b[2];
+    assert.ok(Number.isFinite(px) && Number.isFinite(py));
+    assert.ok(
+      px >= cx && px <= cx + cw && py >= cy && py <= cy + ch,
+      'FH2 point outside map crop: ' + id,
+    );
+  }
+  for (const level of config.tiles.levels)
+    for (let y = 0; y < level.rows; y++)
+      for (let x = 0; x < level.cols; x++) {
+        const size = statSync(
+          new URL(config.tiles.base + '/' + level.z + '/' + x + '-' + y + '.webp', root),
+        ).size;
+        assert.ok(size > 0 && size < 200000);
+        fh2Tiles++;
+        fh2Bytes += size;
+        fh2Largest = Math.max(size, fh2Largest);
+      }
+}
+console.log(
+  `PASS: FH2 ${fh2.points.length} unique points, two calibrated maps; ${fh2Tiles} tiles, ${fh2Bytes} bytes, largest ${fh2Largest} bytes.`,
+);

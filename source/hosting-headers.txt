@@ -16,3 +16,9 @@
   Cache-Control: no-cache
 /tiles.js
   Cache-Control: no-cache
+/data-fh2.js
+  Cache-Control: no-cache
+/maps-fh2.js
+  Cache-Control: no-cache
+/games.js
+  Cache-Control: no-cache
