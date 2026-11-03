@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="style.css" />
     <script defer src="data.js"></script>
     <script defer src="maps.js"></script>
+    <script defer src="games.js"></script>
     <script defer src="progress.js"></script>
     <script defer src="tiles.js"></script>
     <script defer src="app.js"></script>
@@ -31,14 +32,36 @@
           id="game-fh3-tab"
           role="tab"
           aria-selected="true"
-          aria-controls="game-fh3-panel"
+          aria-controls="game-panel"
           data-game="fh3"
         >
           Forza Horizon 3
         </button>
+        <button
+          type="button"
+          id="game-fh4-tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="game-panel"
+          tabindex="-1"
+          data-game="fh4"
+        >
+          Forza Horizon 4
+        </button>
+        <button
+          type="button"
+          id="game-fh5-tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="game-panel"
+          tabindex="-1"
+          data-game="fh5"
+        >
+          Forza Horizon 5
+        </button>
       </div>
     </nav>
-    <div class="workspace" id="game-fh3-panel" role="tabpanel" aria-labelledby="game-fh3-tab">
+    <div class="workspace" id="game-panel" role="tabpanel" aria-labelledby="game-fh3-tab">
       <aside class="sidebar" id="sidebar" aria-label="收集筛选与进度">
         <div class="sidebar-content">
           <div class="sidebar-heading">
@@ -51,7 +74,8 @@
               <span>总收集进度</span><span id="total-percent">0%</span>
             </div>
             <div class="progress-number">
-              <strong id="total-done">0</strong><span>/ 235</span><small>已收集</small>
+              <strong id="total-done">0</strong><span id="total-count">/ 235</span
+              ><small>已收集</small>
             </div>
             <div class="progress-track"><i id="total-bar"></i></div>
             <div class="progress-bottom"><span id="remaining">未收集 235 个</span></div>
@@ -77,11 +101,13 @@
           </div>
           <p class="source-credit">
             底图：<a
+              id="image-source"
               href="https://www.spriters-resource.com/xbox_one/forzahorizon3/"
               target="_blank"
               rel="noopener noreferrer"
               >The Spriters Resource ↗</a
             ><br />点位：<a
+              id="point-source"
               href="https://www.kudosprime.com/fh3/gamemap.php"
               target="_blank"
               rel="noopener noreferrer"

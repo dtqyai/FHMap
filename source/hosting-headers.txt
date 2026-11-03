@@ -16,3 +16,6 @@
   Cache-Control: no-cache
 /tiles.js
   Cache-Control: no-cache
+
+/games.js
+  Cache-Control: no-cache

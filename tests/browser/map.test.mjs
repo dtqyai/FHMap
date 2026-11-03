@@ -96,7 +96,7 @@ before(async () => {
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   url = 'http://127.0.0.1:' + server.address().port;
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, channel: 'chromium' });
 });
 after(async () => {
   await browser?.close();
@@ -729,4 +729,89 @@ test('bulk cross-tab synchronization batches reads and only rewrites changed sym
   assert.equal(audit.symbols, 235);
   assert.ok(audit.reads < 235 * 20, 'storage events were not batched: ' + audit.reads + ' reads');
   console.log('Bulk sync: ' + audit.reads + ' storage reads, ' + audit.symbols + ' symbol updates');
+});
+
+test('all six added maps render local tiles, counts, sources and responsive tabs', async () => {
+  const errors = [],
+    requests = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('request', (request) => requests.push(request.url()));
+  await page.goto(url);
+  await ready();
+  assert.ok(
+    !requests.some((request) => /\/fh[45]-/.test(request)),
+    'other games should not load map images on startup',
+  );
+  const maps = [
+    ['fh4', 'britain', '英国', 542],
+    ['fh4', 'fortune-island', '财富岛', 114],
+    ['fh4', 'lego-speed-champions', '乐高谷', 156],
+    ['fh5', 'mexico', '墨西哥', 657],
+    ['fh5', 'horizon-hot-wheels-park', '风火轮公园', 119],
+    ['fh5', 'sierra-nueva', 'Sierra Nueva', 323],
+  ];
+  for (const [game, slug, name, count] of maps) {
+    await page.locator('[data-game="' + game + '"]').click();
+    await page.locator('button[data-region="' + game + '-' + slug + '"]').click();
+    await until(
+      async () => (await page.locator('#map-status').textContent()) === name,
+      name + ' did not load',
+      12000,
+    );
+    assert.equal(await page.locator('#visible-count').textContent(), String(count));
+    assert.equal(await page.locator('.marker:not([hidden])').count(), count);
+    assert.equal(
+      await page.locator('#point-source').getAttribute('href'),
+      'https://mapgenie.io/forza-horizon-' + game.slice(2) + '/maps/' + slug,
+    );
+    assert.equal(await page.locator('.map-layer:not([hidden])').count(), 1);
+    await page.screenshot({ path: resolve(screenshots, game + '-' + slug + '.png') });
+  }
+  assert.ok(
+    requests
+      .filter((request) => /^https?:/.test(request))
+      .every((request) => request.startsWith(url)),
+    'viewer must work entirely from local assets',
+  );
+  assert.ok(Number(await page.locator('#map').getAttribute('data-max-active-requests')) <= 4);
+  assert.deepEqual(errors, []);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('[data-game="fh4"]').click();
+  await until(async () => (await page.locator('#map-status').textContent()) === '英国');
+  assert.ok(await page.locator('[data-game="fh4"]').isVisible());
+  await page.screenshot({ path: resolve(screenshots, 'fh4-mobile.png'), animations: 'disabled' });
+});
+
+test('game switching and reload preserve legacy FH3 and independent FH4/FH5 collections', async () => {
+  await page.goto(url);
+  await ready();
+  await page.evaluate(() => localStorage.setItem('fh3.collect.v1.1', '1'));
+  await page.reload();
+  await ready();
+  await total(1);
+  for (const game of ['fh4', 'fh5']) {
+    await page.locator('[data-game="' + game + '"]').click();
+    await total(0);
+    await (await marker()).click();
+    await total(1);
+  }
+  await page.reload();
+  await ready();
+  await total(1);
+  for (const game of ['fh4', 'fh5', 'fh3']) {
+    await page.locator('[data-game="' + game + '"]').click();
+    await total(1);
+  }
+  await page.locator('[data-game="fh4"]').click();
+  await page.locator('#export-button').click();
+  const backup = JSON.parse(await page.locator('#backup-content').inputValue());
+  assert.equal(backup.app, 'fh4-local-map');
+  assert.equal(backup.collected.length, 1);
+  await page.locator('#close-backup').click();
+  await page.locator('[data-game="fh5"]').click();
+  await page.locator('#import-button').click();
+  await page.locator('#backup-content').fill(JSON.stringify(backup));
+  await page.locator('#backup-submit').click();
+  assert.match(await page.locator('#backup-error').textContent(), /Forza Horizon 5/);
+  await total(1);
 });

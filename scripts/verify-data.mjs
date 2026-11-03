@@ -124,3 +124,66 @@ console.log(
     ' / 3' +
     (checkedSourceImages < 3 ? ' (optional; source/originals/ is not versioned)' : ''),
 );
+
+runInNewContext(readFileSync(new URL('games.js', root), 'utf8'), context);
+const snapshot = JSON.parse(readFileSync(new URL('source/mapgenie.json', root), 'utf8'));
+assert.equal(snapshot.maps.length, 6);
+assert.deepEqual(Object.keys(context.window.FH_GAMES), ['fh3', 'fh4', 'fh5']);
+let addedPoints = 0,
+  addedTiles = 0,
+  addedBytes = 0;
+for (const gameId of ['fh4', 'fh5']) {
+  const game = context.window.FH_GAMES[gameId],
+    ids = new Set(game.data.points.map((point) => point[0]));
+  assert.equal(Object.keys(game.maps).length, 3);
+  assert.equal(ids.size, game.data.points.length, 'Duplicate source point IDs in ' + gameId);
+  for (const record of snapshot.maps.filter((map) => map.game === gameId)) {
+    const region = gameId + '-' + record.slug,
+      config = game.maps[region],
+      points = game.data.points.filter((point) => game.data.types[point[1]].region === region),
+      originals = new Map(record.locations.map((point) => [point.id, point]));
+    assert.equal(points.length, record.locations.length, region + ' point count');
+    assert.equal(config.source, record.url);
+    const world = 256 * 2 ** config.sourceZoom;
+    for (const [id, type, x, y] of points) {
+      const original = originals.get(id);
+      assert.ok(original, 'Unknown MapGenie ID ' + id);
+      assert.equal(type, record.map.id * 100000 + original.category_id);
+      const projectedX = ((original.longitude + 180) / 360) * world - config.sourceOrigin[0],
+        projectedY =
+          ((1 - Math.asinh(Math.tan((original.latitude * Math.PI) / 180)) / Math.PI) / 2) * world -
+          config.sourceOrigin[1];
+      assert.ok(
+        Math.abs(x - projectedX) < 0.001 && Math.abs(y - projectedY) < 0.001,
+        'Projection ' + id,
+      );
+      assert.ok(
+        x >= 0 && x <= config.width && y >= 0 && y <= config.height,
+        'Point outside map ' + id,
+      );
+    }
+    for (const [type, category] of Object.entries(game.data.types).filter(
+      ([, category]) => category.region === region,
+    ))
+      assert.equal(points.filter((point) => point[1] === Number(type)).length, category.total);
+    for (const level of config.tiles.levels) {
+      assert.equal(level.cols, Math.ceil(level.width / config.tiles.size));
+      assert.equal(level.rows, Math.ceil(level.height / config.tiles.size));
+      for (let y = 0; y < level.rows; y++)
+        for (let x = 0; x < level.cols; x++) {
+          const file = new URL(
+              config.tiles.base + '/' + level.z + '/' + x + '-' + y + '.webp',
+              root,
+            ),
+            size = statSync(file).size;
+          assert.ok(size > 0 && size < 200000, 'Unexpected MapGenie tile size');
+          addedTiles++;
+          addedBytes += size;
+        }
+    }
+    addedPoints += points.length;
+  }
+}
+console.log(
+  `PASS: six MapGenie maps, ${addedPoints} source IDs and projected coordinates; ${addedTiles} WebP tiles, ${addedBytes} bytes.`,
+);

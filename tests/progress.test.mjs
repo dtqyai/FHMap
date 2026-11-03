@@ -135,3 +135,26 @@ test('a failed undo restores revisions so the same undo can be retried', () => {
   assert.equal(store.undo(changes).size, 2);
   assert.deepEqual([...store.read()], []);
 });
+
+test('games keep independent progress even when point IDs are identical', () => {
+  const values = new Map(),
+    storage = {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    };
+  const fh3 = create([1, 2], () => storage),
+    fh4 = create([1, 2], () => storage, 'fh4'),
+    fh5 = create([1, 2], () => storage, 'fh5');
+  fh3.set(1, true);
+  fh4.set(2, true);
+  fh5.set(1, true);
+  fh5.set(2, true);
+  assert.deepEqual([...fh3.read()], [1]);
+  assert.deepEqual([...fh4.read()], [2]);
+  assert.deepEqual([...fh5.read()], [1, 2]);
+  fh4.import([1], true);
+  assert.deepEqual([...fh4.read()], [1]);
+  assert.deepEqual([...fh3.read()], [1]);
+  assert.deepEqual([...fh5.read()], [1, 2]);
+});

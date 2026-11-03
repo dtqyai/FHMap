@@ -1,8 +1,16 @@
 # Forza Horizon Interactive Map
 
-按作品选项卡组织的 Forza Horizon 收集地图。目前提供 **Forza Horizon 3**，包含澳洲大陆 183 个点位、暴风雪山 26 个点位、风火轮 26 个点位。
+按作品选项卡组织的 Forza Horizon 收集地图。目前提供以下地图：
 
-各点位独立显示，点击点位直接切换收集状态。支持按类型和状态筛选、拖动缩放、进度导入/导出。进度保存在浏览器 localStorage，无需账号或后端。
+| 作品 | 地图 | 点位 |
+| --- | --- | ---: |
+| Forza Horizon 3 | 澳洲大陆 / 暴风雪山 / 风火轮 | 183 / 26 / 26 |
+| Forza Horizon 4 | 英国 / 财富岛 / 乐高谷 | 542 / 114 / 156 |
+| Forza Horizon 5 | 墨西哥 / 风火轮公园 / Sierra Nueva | 657 / 119 / 323 |
+
+点位数量以提取时来源网站提供的数据为准，不代表游戏全部内容均已收录。
+
+各点位独立显示，点击点位直接切换收集状态。支持按类型和状态筛选、拖动缩放、进度导入/导出。进度按作品分别保存在浏览器 localStorage，无需账号或后端。FH3 原有标记和版本 1 备份继续兼容；导入、导出操作针对当前选中的作品。
 
 ## 本地运行
 
@@ -27,8 +35,8 @@ python3 -m http.server 8763 --bind 127.0.0.1
 | `index.html`、`style.css`、`app.js` | 页面、筛选与地图交互，无第三方运行依赖 |
 | `tiles.js`、`progress.js` | 瓦片加载/恢复与进度事务/回滚 |
 | `tests/` | 存储单元测试与浏览器回归测试 |
-| `data.js`、`maps.js` | 原站点位及高清地图配置 |
-| `assets/maps/` | 360 块运行所需的多级 WebP 瓦片，约 19.3 MB |
+| `data.js`、`maps.js`、`games.js` | 三部作品的点位、分类及地图配置 |
+| `assets/maps/` | 九张地图运行所需的多级 WebP 瓦片，按视口加载 |
 | `assets/favicon.svg` | 页面图标 |
 | `source/` | 点位提取记录、配准结果、构建统计与缓存配置 |
 | `source/reference/` | 核对来源所用的旧底图与原站样式，不被页面加载 |
@@ -37,7 +45,7 @@ python3 -m http.server 8763 --bind 127.0.0.1
 
 以下目录由 `.gitignore` 排除：
 
-- `source/originals/`：三张原始高清 PNG，合计约 239 MB，仅本地保留。
+- `source/originals/`：FH3 原始高清 PNG 和 FH4/FH5 下载的源瓦片，仅本地保留。
 - `dist/`：构建输出，避免重复提交瓦片。
 - `verification/`：本地验证截图、备份样本及历史记录。
 - 除根目录 `README.md` 之外的 Markdown 文档、本地启动器、环境文件、缓存、日志和系统文件。
@@ -66,7 +74,7 @@ npm run test:browser
 npm run format:check
 ```
 
-浏览器测试运行构建后的 `dist/`，覆盖加载失败后的自动/手动/联网恢复、标记独立显示、拖动与点击、快捷键、备份下载、导入/替换/撤销、存储失败回滚、跨标签页同步和批量刷新、键盘焦点导航、请求挂起超时、手机触摸命中及宽窄屏切换。截图写入本地 `verification/`。
+浏览器测试运行构建后的 `dist/`，覆盖加载失败后的自动/手动/联网恢复、标记独立显示、拖动与点击、快捷键、备份下载、导入/替换/撤销、存储失败回滚、跨标签页同步和批量刷新、键盘焦点导航、请求挂起超时、手机触摸命中及宽窄屏切换。同时覆盖六张新增地图、多作品进度隔离、跨作品备份校验和手机作品切换。截图写入本地 `verification/`。
 
 GitHub Actions 在推送和拉取请求时执行格式、语法、数据校验、存储测试、静态包构建和浏览器回归测试。
 
@@ -108,8 +116,22 @@ node scripts/build-site.mjs
 
 `--source-images` 要求三张 PNG 均存在并校验尺寸；普通校验在没有原图时仍会校验点位、配准参数和全部瓦片。本地原图不上传，`maps.js` 和生成的 WebP 瓦片需要提交。
 
+## 重新生成 FH4 / FH5 瓦片
+
+`source/mapgenie.json` 保存六张公开地图的分类、原站 ID、经纬度和瓦片配置。安装 Pillow 后运行：
+
+```sh
+python3 scripts/build-mapgenie.py
+node scripts/verify-data.mjs
+node scripts/build-site.mjs
+```
+
+脚本缓存源 JPG 到已忽略的 `source/originals/mapgenie/`，按点位范围裁切并生成 512 像素 WebP 瓦片，以及 `games.js`。页面运行不依赖 MapGenie 的接口或 CDN。FH4 英国与乐高谷、FH5 墨西哥使用夏季底图，其余区域使用默认底图；坐标按原站 Web Mercator 投影转换，不旋转底图。
+
 ## 数据与图片来源
 
 点位来自 [KudosPrime FH3 地图](https://www.kudosprime.com/fh3/gamemap.php)，提取日期为 2026-10-21，保留原站 ID、类别、源坐标和提示。原站没有 #145，实际为 235 个点位；未逐点进入游戏核验。
 
 底图来自 [The Spriters Resource 的 Forza Horizon 3 页面](https://www.spriters-resource.com/xbox_one/forzahorizon3/)，使用用户提供的三张高清 PNG；Australia 图署名为 Trekeln。暴风雪山高清瓦片保留最初地图的朝向，点位使用同一参考坐标系；原始 PNG 保持不变。Forza Horizon 为 Microsoft 的商标。
+
+FH4 和 FH5 的六张底图与点位来自 [MapGenie FH4](https://mapgenie.io/forza-horizon-4/maps/britain) 和 [MapGenie FH5](https://mapgenie.io/forza-horizon-5/maps/mexico)，提取日期为 2026-11-03。保留原站点位 ID、分类和坐标，不复制攻略正文；未逐点进入游戏核验。
